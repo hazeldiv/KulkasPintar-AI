@@ -20,6 +20,19 @@ export interface AnalyzeResponse {
   recipes: ScanRecipe[];
 }
 
+function handleGeminiError(error: unknown): never {
+  console.error('Gemini API execution failed:', error);
+  const errStr = error instanceof Error ? error.message : String(error);
+  if (
+    errStr.includes('high demand') ||
+    errStr.includes('503') ||
+    errStr.includes('UNAVAILABLE')
+  ) {
+    throw new Error('AI server is busy. Please try again later.');
+  }
+  throw new Error(`Gemini API Error: ${error}`);
+}
+
 function getGeminiClient(): GoogleGenAI | null {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -292,8 +305,7 @@ Do not write markdown block quotes (like \`\`\`json), just return raw JSON text.
 
     return JSON.parse(resultText) as AnalyzeResponse;
   } catch (error) {
-    console.error('Gemini API execution failed:', error);
-    throw new Error(`Gemini API Error: ${error}`);
+    handleGeminiError(error);
   }
 }
 
@@ -375,8 +387,7 @@ Do not write markdown block quotes (like \`\`\`json), just return raw JSON text.
 
     return JSON.parse(resultText) as ScanRecipe[];
   } catch (error) {
-    console.error('Gemini API execution failed:', error);
-    throw new Error(`Gemini API Error: ${error}`);
+    handleGeminiError(error);
   }
 }
 

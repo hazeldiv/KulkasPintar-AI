@@ -19,6 +19,7 @@ interface InventoryPanelProps {
   onDecrementQty: (id: number, currentQty: number) => void;
   onDeleteClick: (id: number) => void;
   onDeleteAllClick?: () => void;
+  onDeleteSelectedClick?: (ids: number[]) => void;
 }
 
 export const calculateExpirationStatus = (addedAtStr: string, expiresAtStr: string | null) => {
@@ -52,8 +53,10 @@ export const InventoryPanel: React.FC<InventoryPanelProps> = ({
   onDecrementQty,
   onDeleteClick,
   onDeleteAllClick,
+  onDeleteSelectedClick,
 }) => {
   const [currentPage, setCurrentPage] = React.useState(1);
+  const [selectedIds, setSelectedIds] = React.useState<number[]>([]);
   const ITEMS_PER_PAGE = 10;
   const totalPages = Math.ceil(items.length / ITEMS_PER_PAGE);
 
@@ -63,6 +66,12 @@ export const InventoryPanel: React.FC<InventoryPanelProps> = ({
       setCurrentPage(totalPages);
     }
   }, [items.length, totalPages, currentPage]);
+
+  // Sync selectedIds with items when items list changes
+  React.useEffect(() => {
+    const itemIds = new Set(items.map((item) => item.id));
+    setSelectedIds((prev) => prev.filter((id) => itemIds.has(id)));
+  }, [items]);
 
   const paginatedItems = items.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
@@ -76,21 +85,35 @@ export const InventoryPanel: React.FC<InventoryPanelProps> = ({
           <h2 className="text-lg font-bold text-slate-800">Digital Inventory</h2>
           <p className="text-xs text-slate-500">Manage ingredients in your kitchen cabinet & fridge.</p>
         </div>
-        
+
         {/* Actions Button Group */}
         <div className="flex items-center gap-2">
-          {items.length > 0 && onDeleteAllClick && (
+          {selectedIds.length > 0 && onDeleteSelectedClick ? (
             <button
               type="button"
-              id="btn-delete-all"
-              onClick={onDeleteAllClick}
+              id="btn-delete-selected"
+              onClick={() => onDeleteSelectedClick(selectedIds)}
               className="text-xs px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-650 border border-rose-200 font-bold rounded-xl transition cursor-pointer flex items-center gap-1.5"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
               </svg>
-              Clear All
+              Delete Selected ({selectedIds.length})
             </button>
+          ) : (
+            items.length > 0 && onDeleteAllClick && (
+              <button
+                type="button"
+                id="btn-delete-all"
+                onClick={onDeleteAllClick}
+                className="text-xs px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-650 border border-rose-200 font-bold rounded-xl transition cursor-pointer flex items-center gap-1.5"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                </svg>
+                Delete All
+              </button>
+            )
           )}
 
           <button
@@ -112,6 +135,36 @@ export const InventoryPanel: React.FC<InventoryPanelProps> = ({
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-slate-200 text-[10px] uppercase font-bold text-slate-500 tracking-wider bg-slate-50/50">
+                <th className="py-3.5 px-2 xl:px-4 w-10 text-center">
+                  {items.length > 0 && (
+                    <input
+                      type="checkbox"
+                      className="rounded border-slate-300 text-teal-600 focus:ring-teal-500 cursor-pointer h-3.5 w-3.5"
+                      checked={
+                        paginatedItems.length > 0 &&
+                        paginatedItems.every((item) => selectedIds.includes(item.id))
+                      }
+                      onChange={(e) => {
+                        const pageIds = paginatedItems.map((item) => item.id);
+                        if (e.target.checked) {
+                          setSelectedIds((prev) => {
+                            const newSelection = [...prev];
+                            pageIds.forEach((id) => {
+                              if (!newSelection.includes(id)) {
+                                newSelection.push(id);
+                              }
+                            });
+                            return newSelection;
+                          });
+                        } else {
+                          setSelectedIds((prev) =>
+                            prev.filter((id) => !pageIds.includes(id))
+                          );
+                        }
+                      }}
+                    />
+                  )}
+                </th>
                 <th className="py-3.5 px-2 xl:px-4">Ingredient</th>
                 <th className="py-3.5 px-2 xl:px-4">Category</th>
                 <th className="py-3.5 px-2 xl:px-4 text-center">Qty</th>
@@ -122,18 +175,34 @@ export const InventoryPanel: React.FC<InventoryPanelProps> = ({
             <tbody id="inventory-list" className="divide-y divide-slate-200">
               {items.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-12 text-center text-slate-500 text-xs">
+                  <td colSpan={6} className="py-12 text-center text-slate-500 text-xs">
                     Your inventory is empty. Add items manually or upload a picture.
                   </td>
                 </tr>
               ) : (
                 paginatedItems.map((item) => {
                   const exp = calculateExpirationStatus(item.addedAt, item.expiresAt);
+                  const isSelected = selectedIds.includes(item.id);
                   return (
                     <tr
                       key={item.id}
-                      className="border-b border-slate-200 hover:bg-slate-50 text-xs transition duration-200 text-slate-700"
+                      className={`border-b border-slate-200 hover:bg-slate-50 text-xs transition duration-200 text-slate-700 ${isSelected ? 'bg-slate-50/80 font-medium' : ''
+                        }`}
                     >
+                      <td className="py-4 px-2 xl:px-4 text-center">
+                        <input
+                          type="checkbox"
+                          className="rounded border-slate-300 text-teal-600 focus:ring-teal-500 cursor-pointer h-3.5 w-3.5"
+                          checked={isSelected}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedIds((prev) => [...prev, item.id]);
+                            } else {
+                              setSelectedIds((prev) => prev.filter((id) => id !== item.id));
+                            }
+                          }}
+                        />
+                      </td>
                       <td className="py-4 px-2 xl:px-4 font-bold text-slate-800">{item.name}</td>
                       <td className="py-4 px-2 xl:px-4 text-slate-550">{item.category}</td>
                       <td className="py-4 px-2 xl:px-4 text-center font-semibold text-slate-700">

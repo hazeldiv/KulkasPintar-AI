@@ -153,7 +153,7 @@ export async function POST(request: Request) {
   }
 }
 
-export async function DELETE() {
+export async function DELETE(request: Request) {
   try {
     const user = await getCurrentUser();
     if (!user) {
@@ -163,7 +163,52 @@ export async function DELETE() {
       );
     }
 
+    let body: any = null;
+    try {
+      body = await request.json();
+    } catch (e) {
+      // Body is optional (for clear all)
+    }
+
+    const idsToDelete = body?.ids as number[] | undefined;
     const activeRoom = await getUserActiveRoom(user.id);
+
+    if (idsToDelete && idsToDelete.length > 0) {
+      // Fetch names of items to find recipes using them
+      const itemsToDelete = await prisma.inventoryItem.findMany({
+        where: { id: { in: idsToDelete } },
+      });
+
+      const itemNamesLower = itemsToDelete.map((item) => item.name.toLowerCase());
+
+      // Fetch recipes to check for dependencies
+      const recipes = await prisma.recipe.findMany({
+        where: activeRoom
+          ? { roomId: activeRoom.roomId }
+          : { userId: user.id, roomId: null },
+      });
+
+      const recipeIdsToDelete = recipes
+        .filter((r) =>
+          r.ingredientsUsed.some((ing) => itemNamesLower.includes(ing.toLowerCase()))
+        )
+        .map((r) => r.id);
+
+      await prisma.$transaction([
+        prisma.inventoryItem.deleteMany({
+          where: { id: { in: idsToDelete } },
+        }),
+        ...(recipeIdsToDelete.length > 0
+          ? [
+              prisma.recipe.deleteMany({
+                where: { id: { in: recipeIdsToDelete } },
+              }),
+            ]
+          : []),
+      ]);
+
+      return NextResponse.json({ message: `${idsToDelete.length} items and related recipes deleted` });
+    }
 
     if (activeRoom) {
       const members = await prisma.sharedRoom.findMany({

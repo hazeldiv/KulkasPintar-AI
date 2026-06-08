@@ -46,7 +46,7 @@ function AppContent() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [deleteConfirmState, setDeleteConfirmState] = useState<{
     isOpen: boolean;
-    targetId: number | 'all' | null;
+    targetId: number | number[] | 'all' | null;
     title: string;
     message: string;
   }>({
@@ -319,6 +319,15 @@ function AppContent() {
     });
   };
 
+  const promptDeleteSelected = (ids: number[]) => {
+    setDeleteConfirmState({
+      isOpen: true,
+      targetId: ids,
+      title: 'Delete Selected Ingredients',
+      message: `Are you sure you want to delete the ${ids.length} selected ingredients? This will also remove any recipes that use these ingredients.`,
+    });
+  };
+
   const handleDelete = async (id: number) => {
     try {
       const res = await fetch(`/api/inventory/${id}`, {
@@ -357,10 +366,33 @@ function AppContent() {
     }
   };
 
+  const handleDeleteSelected = async (ids: number[]) => {
+    try {
+      const res = await fetch('/api/inventory', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids }),
+      });
+
+      if (res.ok) {
+        showToast(`${ids.length} items deleted from inventory`, 'info');
+        fetchInventory();
+        fetchRecipes();
+      } else {
+        const data = await res.json();
+        showToast(data.detail || 'Failed to delete selected items', 'error');
+      }
+    } catch (err) {
+      showToast('Failed to delete selected items', 'error');
+    }
+  };
+
   const handleConfirmDelete = () => {
     const target = deleteConfirmState.targetId;
     if (target === 'all') {
       handleDeleteAll();
+    } else if (Array.isArray(target)) {
+      handleDeleteSelected(target);
     } else if (typeof target === 'number') {
       handleDelete(target);
     }
@@ -531,6 +563,7 @@ function AppContent() {
             promptDeleteSingle(id, item ? item.name : 'this item');
           }}
           onDeleteAllClick={promptDeleteAll}
+          onDeleteSelectedClick={promptDeleteSelected}
         />
         <RecipePanel
           recipes={recipes}
