@@ -18,6 +18,7 @@ interface InventoryPanelProps {
   onIncrementQty: (id: number, currentQty: number) => void;
   onDecrementQty: (id: number, currentQty: number) => void;
   onDeleteClick: (id: number) => void;
+  onDeleteAllClick?: () => void;
 }
 
 export const calculateExpirationStatus = (addedAtStr: string, expiresAtStr: string | null) => {
@@ -50,6 +51,7 @@ export const InventoryPanel: React.FC<InventoryPanelProps> = ({
   onIncrementQty,
   onDecrementQty,
   onDeleteClick,
+  onDeleteAllClick,
 }) => {
   const [currentPage, setCurrentPage] = React.useState(1);
   const ITEMS_PER_PAGE = 10;
@@ -75,17 +77,33 @@ export const InventoryPanel: React.FC<InventoryPanelProps> = ({
           <p className="text-xs text-slate-500">Manage ingredients in your kitchen cabinet & fridge.</p>
         </div>
         
-        {/* Quick Add Button */}
-        <button
-          type="button"
-          onClick={onAddItemClick}
-          className="text-xs px-3.5 py-2 bg-teal-650 hover:bg-teal-700 active:scale-98 text-white font-bold rounded-xl shadow-md transition cursor-pointer flex items-center gap-1.5"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4"></path>
-          </svg>
-          Add Item
-        </button>
+        {/* Actions Button Group */}
+        <div className="flex items-center gap-2">
+          {items.length > 0 && onDeleteAllClick && (
+            <button
+              type="button"
+              id="btn-delete-all"
+              onClick={onDeleteAllClick}
+              className="text-xs px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-650 border border-rose-200 font-bold rounded-xl transition cursor-pointer flex items-center gap-1.5"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+              </svg>
+              Clear All
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={onAddItemClick}
+            className="text-xs px-3.5 py-2 bg-teal-650 hover:bg-teal-700 active:scale-98 text-white font-bold rounded-xl shadow-md transition cursor-pointer flex items-center gap-1.5"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4"></path>
+            </svg>
+            Add Item
+          </button>
+        </div>
       </div>
 
       {/* Inventory List View */}

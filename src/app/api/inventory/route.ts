@@ -152,3 +152,51 @@ export async function POST(request: Request) {
     );
   }
 }
+
+export async function DELETE() {
+  try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json(
+        { detail: 'Could not validate credentials. Please log in.' },
+        { status: 401 }
+      );
+    }
+
+    const activeRoom = await getUserActiveRoom(user.id);
+
+    if (activeRoom) {
+      const members = await prisma.sharedRoom.findMany({
+        where: { roomId: activeRoom.roomId },
+        select: { userId: true },
+      });
+      const userIds = members.map((m) => m.userId);
+
+      await prisma.$transaction([
+        prisma.inventoryItem.deleteMany({
+          where: { userId: { in: userIds } },
+        }),
+        prisma.recipe.deleteMany({
+          where: { roomId: activeRoom.roomId },
+        }),
+      ]);
+    } else {
+      await prisma.$transaction([
+        prisma.inventoryItem.deleteMany({
+          where: { userId: user.id },
+        }),
+        prisma.recipe.deleteMany({
+          where: { userId: user.id, roomId: null },
+        }),
+      ]);
+    }
+
+    return NextResponse.json({ message: 'All inventory items and related recipes cleared' });
+  } catch (error) {
+    console.error('Clear inventory error:', error);
+    return NextResponse.json(
+      { detail: 'An error occurred clearing inventory' },
+      { status: 500 }
+    );
+  }
+}

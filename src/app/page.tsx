@@ -12,6 +12,7 @@ import { AddItemModal } from '@/components/modals/AddItemModal';
 import { ScanUploadModal } from '@/components/modals/ScanUploadModal';
 import { ConfirmLoggingModal } from '@/components/modals/ConfirmLoggingModal';
 import { RoomModal } from '@/components/modals/RoomModal';
+import { ConfirmDeleteModal } from '@/components/modals/ConfirmDeleteModal';
 import { GlobalLoader } from '@/components/GlobalLoader';
 import { ScanIngredient } from '@/lib/gemini-service';
 
@@ -43,6 +44,17 @@ function AppContent() {
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [isRoomModalOpen, setIsRoomModalOpen] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [deleteConfirmState, setDeleteConfirmState] = useState<{
+    isOpen: boolean;
+    targetId: number | 'all' | null;
+    title: string;
+    message: string;
+  }>({
+    isOpen: false,
+    targetId: null,
+    title: '',
+    message: '',
+  });
 
   const [roomState, setRoomState] = useState<RoomState>({
     inRoom: false,
@@ -266,7 +278,8 @@ function AppContent() {
 
   const handleDecrementQty = async (id: number, currentQty: number) => {
     if (currentQty <= 1) {
-      handleDelete(id);
+      const item = inventory.find((i) => i.id === id);
+      promptDeleteSingle(id, item ? item.name : 'this item');
       return;
     }
 
@@ -288,6 +301,24 @@ function AppContent() {
     }
   };
 
+  const promptDeleteSingle = (id: number, name: string) => {
+    setDeleteConfirmState({
+      isOpen: true,
+      targetId: id,
+      title: 'Delete Ingredient',
+      message: `Are you sure you want to remove "${name}" from your inventory? This will also remove any recipes that use this ingredient.`,
+    });
+  };
+
+  const promptDeleteAll = () => {
+    setDeleteConfirmState({
+      isOpen: true,
+      targetId: 'all',
+      title: 'Clear Inventory',
+      message: 'Are you sure you want to delete all ingredients from your inventory? This action cannot be undone and will clear all saved recipes.',
+    });
+  };
+
   const handleDelete = async (id: number) => {
     try {
       const res = await fetch(`/api/inventory/${id}`, {
@@ -304,6 +335,34 @@ function AppContent() {
       }
     } catch (err) {
       showToast('Failed to delete item', 'error');
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    try {
+      const res = await fetch('/api/inventory', {
+        method: 'DELETE',
+      });
+
+      if (res.ok) {
+        showToast('All inventory items cleared', 'info');
+        fetchInventory();
+        fetchRecipes();
+      } else {
+        const data = await res.json();
+        showToast(data.detail || 'Failed to clear inventory', 'error');
+      }
+    } catch (err) {
+      showToast('Failed to clear inventory', 'error');
+    }
+  };
+
+  const handleConfirmDelete = () => {
+    const target = deleteConfirmState.targetId;
+    if (target === 'all') {
+      handleDeleteAll();
+    } else if (typeof target === 'number') {
+      handleDelete(target);
     }
   };
 
@@ -467,7 +526,11 @@ function AppContent() {
           onAddItemClick={() => setIsAddItemModalOpen(true)}
           onIncrementQty={handleIncrementQty}
           onDecrementQty={handleDecrementQty}
-          onDeleteClick={handleDelete}
+          onDeleteClick={(id) => {
+            const item = inventory.find((i) => i.id === id);
+            promptDeleteSingle(id, item ? item.name : 'this item');
+          }}
+          onDeleteAllClick={promptDeleteAll}
         />
         <RecipePanel
           recipes={recipes}
@@ -512,6 +575,14 @@ function AppContent() {
         onJoinRoom={handleJoinRoom}
         onLeaveRoom={handleLeaveRoom}
         onInviteMember={handleInviteMember}
+      />
+
+      <ConfirmDeleteModal
+        isOpen={deleteConfirmState.isOpen}
+        onClose={() => setDeleteConfirmState((prev) => ({ ...prev, isOpen: false }))}
+        onConfirm={handleConfirmDelete}
+        title={deleteConfirmState.title}
+        message={deleteConfirmState.message}
       />
 
       <GlobalLoader isOpen={isAnalyzing} />
