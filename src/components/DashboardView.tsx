@@ -30,10 +30,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* Header */}
       <header className="bg-white/80 border-b border-slate-200 px-6 py-4 flex items-center justify-between flex-shrink-0 backdrop-blur-md">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-teal-50 border border-teal-200/50 rounded-xl shadow-[0_0_15px_rgba(20,184,166,0.1)]">
-            <svg className="w-6 h-6 text-teal-650" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
-            </svg>
+          <div className="p-1 bg-teal-50 border border-teal-200/50 rounded-xl shadow-[0_0_15px_rgba(20,184,166,0.1)] flex items-center justify-center">
+            <img src="/logo.png" className="w-8 h-8 object-contain rounded-lg" alt="KulkasPintar AI Logo" />
           </div>
           <h1 className="text-xl font-bold tracking-tight text-slate-800">
             KulkasPintar <span className="text-teal-650 font-extrabold">AI</span>
