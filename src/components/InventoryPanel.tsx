@@ -52,7 +52,7 @@ export const InventoryPanel: React.FC<InventoryPanelProps> = ({
   onDeleteClick,
 }) => {
   return (
-    <section className="flex-1 border-b lg:border-b-0 lg:border-r border-slate-200 p-6 overflow-y-auto flex flex-col gap-6">
+    <section className="w-full lg:flex-1 border-b lg:border-b-0 lg:border-r border-slate-200 p-6 lg:overflow-y-auto flex flex-col gap-6 flex-shrink-0 lg:flex-shrink">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-bold text-slate-800">Digital Inventory</h2>

@@ -88,7 +88,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       </header>
 
       {/* Main Workspace Area */}
-      <main className="flex-1 flex overflow-hidden flex-col lg:flex-row">
+      <main className="flex-1 flex overflow-y-auto lg:overflow-hidden flex-col lg:flex-row">
         {children}
       </main>
     </div>

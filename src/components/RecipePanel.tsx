@@ -32,7 +32,7 @@ export const RecipePanel: React.FC<RecipePanelProps> = ({
   };
 
   return (
-    <section className="w-full lg:w-96 bg-[#FCFBF9] p-6 overflow-y-auto flex flex-col gap-6 flex-shrink-0">
+    <section className="w-full lg:w-96 bg-[#FCFBF9] p-6 lg:overflow-y-auto flex flex-col gap-6 flex-shrink-0">
       <div className="flex items-center justify-between">
         <div className="flex-1 pr-2">
           <h2 className="text-lg font-bold text-slate-800">AI Chef's Corner</h2>
