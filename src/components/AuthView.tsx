@@ -29,7 +29,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLoginSuccess }) => {
           body: JSON.stringify({ email, password }),
         });
         const data = await res.json();
-        
+
         if (!res.ok) {
           throw new Error(data.detail || 'Incorrect email or password');
         }
@@ -74,9 +74,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLoginSuccess }) => {
     <div id="auth-view" className="flex-1 flex flex-col justify-center py-12 sm:px-6 lg:px-8 bg-gradient-to-tr from-[#FAF9F5] via-[#F4F3EE] to-[#EAE9E2] overflow-y-auto">
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
         <div className="inline-flex items-center justify-center p-3 bg-teal-50 border border-teal-200/50 rounded-2xl mb-4 shadow-[0_0_30px_-5px_rgba(20,184,166,0.15)]">
-          <svg className="w-12 h-12 text-teal-650" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
-          </svg>
+          <img src="/logo.png" className="w-16 h-16 object-contain rounded-lg" alt="KulkasPintar AI Logo" />
         </div>
         <h2 className="text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl bg-clip-text text-transparent bg-gradient-to-r from-teal-650 to-indigo-600">
           KulkasPintar AI
@@ -93,22 +91,20 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLoginSuccess }) => {
             <button
               type="button"
               onClick={() => setIsLoginMode(true)}
-              className={`flex-1 pb-3 text-center border-b-2 font-semibold transition cursor-pointer ${
-                isLoginMode
-                  ? 'border-teal-650 text-teal-650'
-                  : 'border-transparent text-slate-550 hover:text-slate-800'
-              }`}
+              className={`flex-1 pb-3 text-center border-b-2 font-semibold transition cursor-pointer ${isLoginMode
+                ? 'border-teal-650 text-teal-650'
+                : 'border-transparent text-slate-550 hover:text-slate-800'
+                }`}
             >
               Log In
             </button>
             <button
               type="button"
               onClick={() => setIsLoginMode(false)}
-              className={`flex-1 pb-3 text-center border-b-2 font-semibold transition cursor-pointer ${
-                !isLoginMode
-                  ? 'border-teal-650 text-teal-650'
-                  : 'border-transparent text-slate-550 hover:text-slate-800'
-              }`}
+              className={`flex-1 pb-3 text-center border-b-2 font-semibold transition cursor-pointer ${!isLoginMode
+                ? 'border-teal-650 text-teal-650'
+                : 'border-transparent text-slate-550 hover:text-slate-800'
+                }`}
             >
               Register
             </button>
