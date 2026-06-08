@@ -1,0 +1,47 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id                  Int             @id @default(autoincrement())
+  email               String          @unique
+  hashedPassword      String
+  dietaryRestrictions String[]        @default([])
+  createdAt           DateTime        @default(now())
+  
+  items               InventoryItem[]
+  sharedRooms         SharedRoom[]
+
+  @@map("users")
+}
+
+model InventoryItem {
+  id        Int       @id @default(autoincrement())
+  userId    Int       @map("user_id")
+  name      String
+  quantity  Float     @default(1.0)
+  unit      String    @default("pcs")
+  category  String    @default("Others")
+  addedAt   DateTime  @default(now()) @map("added_at")
+  expiresAt DateTime? @map("expires_at")
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("inventory_items")
+}
+
+model SharedRoom {
+  id       Int      @id @default(autoincrement())
+  roomId   String   @map("room_id")
+  userId   Int      @map("user_id")
+  joinedAt DateTime @default(now()) @map("joined_at")
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([roomId])
+  @@map("shared_rooms")
+}
