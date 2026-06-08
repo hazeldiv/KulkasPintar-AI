@@ -15,6 +15,7 @@ model User {
   
   items               InventoryItem[]
   sharedRooms         SharedRoom[]
+  recipes             Recipe[]
 
   @@map("users")
 }
@@ -44,4 +45,19 @@ model SharedRoom {
 
   @@index([roomId])
   @@map("shared_rooms")
+}
+
+model Recipe {
+  id              Int      @id @default(autoincrement())
+  userId          Int      @map("user_id")
+  roomId          String?  @map("room_id")
+  name            String
+  prepTime        String   @map("prep_time")
+  ingredientsUsed String[] @map("ingredients_used")
+  instructions    String[]
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("recipes")
 }

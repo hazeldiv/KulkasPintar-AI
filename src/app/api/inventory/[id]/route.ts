@@ -115,9 +115,38 @@ export async function DELETE(
       );
     }
 
-    await prisma.inventoryItem.delete({
-      where: { id: itemId },
+    // Find user's active room
+    const activeRoom = await prisma.sharedRoom.findFirst({
+      where: { userId: user.id },
     });
+
+    // Fetch recipes for the user/room to check for dependencies
+    const recipes = await prisma.recipe.findMany({
+      where: activeRoom
+        ? { roomId: activeRoom.roomId }
+        : { userId: user.id, roomId: null },
+    });
+
+    const itemNameLower = item.name.toLowerCase();
+    const recipeIdsToDelete = recipes
+      .filter((r) =>
+        r.ingredientsUsed.some((ing) => ing.toLowerCase() === itemNameLower)
+      )
+      .map((r) => r.id);
+
+    // Perform atomic deletion of inventory item and related recipes
+    await prisma.$transaction([
+      prisma.inventoryItem.delete({
+        where: { id: itemId },
+      }),
+      ...(recipeIdsToDelete.length > 0
+        ? [
+            prisma.recipe.deleteMany({
+              where: { id: { in: recipeIdsToDelete } },
+            }),
+          ]
+        : []),
+    ]);
 
     return NextResponse.json({ message: 'Item deleted successfully' });
   } catch (error) {

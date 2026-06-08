@@ -89,6 +89,18 @@ function AppContent() {
     }
   };
 
+  const fetchRecipes = async () => {
+    try {
+      const res = await fetch('/api/recipes');
+      if (res.ok) {
+        const data = await res.json();
+        setRecipes(data.recipes || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch recipes:', err);
+    }
+  };
+
   const checkAuth = async () => {
     try {
       const res = await fetch('/api/auth/me');
@@ -98,6 +110,7 @@ function AppContent() {
         setDietaryRestrictions(data.dietary_restrictions || []);
         setIsAuthenticated(true);
         fetchInventory();
+        fetchRecipes();
         fetchRoomStatus();
 
         // Check for pending room links in local storage
@@ -145,6 +158,7 @@ function AppContent() {
         history.pushState(null, '', `/room/${roomId}`);
         await fetchRoomStatus();
         await fetchInventory();
+        await fetchRecipes();
       } else {
         const data = await res.json();
         showToast(data.detail || 'Failed to join room', 'error');
@@ -165,6 +179,7 @@ function AppContent() {
         history.pushState(null, '', '/');
         await fetchRoomStatus();
         await fetchInventory();
+        await fetchRecipes();
       } else {
         const data = await res.json();
         showToast(data.detail || 'Failed to leave room', 'error');
@@ -282,6 +297,7 @@ function AppContent() {
       if (res.ok) {
         showToast('Item deleted from inventory', 'info');
         fetchInventory();
+        fetchRecipes();
       } else {
         const data = await res.json();
         showToast(data.detail || 'Failed to delete item', 'error');

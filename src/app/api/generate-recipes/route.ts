@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { fetchUserInventory } from '@/lib/inventory-helper';
 import { generateRecipesFromIngredients } from '@/lib/gemini-service';
+import { saveUserRecipes } from '@/lib/recipe-helper';
 
 export async function POST(request: Request) {
   try {
@@ -39,6 +40,9 @@ export async function POST(request: Request) {
       strictMatch,
       saveTheFood
     );
+
+    // Persist generated recipes in database
+    await saveUserRecipes(user.id, recipes);
 
     return NextResponse.json({ recipes });
   } catch (error: any) {
