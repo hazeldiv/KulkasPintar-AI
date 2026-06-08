@@ -296,3 +296,87 @@ Do not write markdown block quotes (like \`\`\`json), just return raw JSON text.
     throw new Error(`Gemini API Error: ${error}`);
   }
 }
+
+export async function generateRecipesFromIngredients(
+  dietaryRestrictions: string[],
+  inventoryItems: { name: string; added_at?: string }[] = [],
+  strictMatch: boolean = false,
+  saveTheFood: boolean = false
+): Promise<ScanRecipe[]> {
+  const client = getGeminiClient();
+  const invNames = inventoryItems.map((item) => item.name);
+
+  let oldestItems: string[] = [];
+  if (saveTheFood && inventoryItems.length > 0) {
+    const sorted = [...inventoryItems].sort((a, b) => {
+      return (a.added_at || '').localeCompare(b.added_at || '');
+    });
+    oldestItems = sorted.slice(0, 3).map((item) => item.name);
+  }
+
+  if (!client) {
+    console.warn('GEMINI_API_KEY environment variable is not set. Running in Demo Mode.');
+    const mock = generateMockData(dietaryRestrictions, invNames, strictMatch, oldestItems);
+    return mock.recipes;
+  }
+
+  try {
+    const inventoryContext = invNames.length > 0
+      ? `\nUser's Current Inventory: ${invNames.join(', ')}${
+          oldestItems.length > 0 ? `\nOldest Ingredients (Prioritize using these): ${oldestItems.join(', ')}` : ''
+        }`
+      : '';
+
+    const dietaryContext = dietaryRestrictions.length > 0
+      ? `\nDietary Restrictions (MUST strictly follow): ${dietaryRestrictions.join(', ')}`
+      : '';
+
+    const prompt = `
+Generate exactly 3 recipes using the ingredients available.
+
+Parameters to follow strictly:
+- "Strict Match Toggle" is set to: ${strictMatch}. 
+  If True, you MUST only generate recipes using ingredients present in the User's Current Inventory list. Do not suggest recipes that require external ingredients not present in the inventory.
+  If False, you can suggest recipes that use primarily the inventory items but can include common pantry staples.
+- "Save the Food Toggle" is set to: ${saveTheFood}.
+  If True, prioritize the "Oldest Ingredients" mentioned below at the top of recipe ingredients and recipe ordering.
+${dietaryContext}
+${inventoryContext}
+
+Return the results ONLY as a valid JSON array matching this schema:
+[
+  {
+    "name": "Recipe Name",
+    "ingredients_used": ["ingredient1", "ingredient2"],
+    "instructions": ["Step 1...", "Step 2..."],
+    "prep_time": "15 mins"
+  }
+]
+Do not write markdown block quotes (like \`\`\`json), just return raw JSON text.
+`;
+
+    const response = await client.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+      },
+    });
+
+    let resultText = response.text?.trim() || '[]';
+    
+    // Clean potential markdown blocks
+    if (resultText.startsWith('```')) {
+      const lines = resultText.split('\n');
+      if (lines[0].startsWith('```')) lines.shift();
+      if (lines[lines.length - 1].startsWith('```')) lines.pop();
+      resultText = lines.join('\n').trim();
+    }
+
+    return JSON.parse(resultText) as ScanRecipe[];
+  } catch (error) {
+    console.error('Gemini API execution failed:', error);
+    throw new Error(`Gemini API Error: ${error}`);
+  }
+}
+

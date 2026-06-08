@@ -383,6 +383,35 @@ function AppContent() {
     }
   };
 
+  const handleGenerateRecipes = async () => {
+    if (inventory.length === 0) return;
+    setIsAnalyzing(true);
+
+    try {
+      const res = await fetch('/api/generate-recipes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          strict_match: strictMatch,
+          save_the_food: saveTheFood,
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.detail || 'Recipe generation failed.');
+      }
+
+      showToast('Recipes generated successfully!', 'success');
+      setRecipes(data.recipes || []);
+    } catch (err: any) {
+      showToast(err.message || 'Recipe generation failed', 'error');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+
   if (isAuthenticated === null) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center bg-[#FAF9F5]">
@@ -424,7 +453,12 @@ function AppContent() {
           onDecrementQty={handleDecrementQty}
           onDeleteClick={handleDelete}
         />
-        <RecipePanel recipes={recipes} />
+        <RecipePanel
+          recipes={recipes}
+          inventoryCount={inventory.length}
+          onGenerateRecipesClick={handleGenerateRecipes}
+          isGenerating={isAnalyzing}
+        />
       </DashboardView>
 
       {/* Modals */}

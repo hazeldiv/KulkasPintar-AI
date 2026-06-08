@@ -11,9 +11,17 @@ export interface Recipe {
 
 interface RecipePanelProps {
   recipes: Recipe[];
+  inventoryCount: number;
+  onGenerateRecipesClick?: () => void;
+  isGenerating?: boolean;
 }
 
-export const RecipePanel: React.FC<RecipePanelProps> = ({ recipes }) => {
+export const RecipePanel: React.FC<RecipePanelProps> = ({
+  recipes,
+  inventoryCount,
+  onGenerateRecipesClick,
+  isGenerating,
+}) => {
   const [expandedIndices, setExpandedIndices] = useState<Record<number, boolean>>({});
 
   const toggleSteps = (index: number) => {
@@ -25,9 +33,21 @@ export const RecipePanel: React.FC<RecipePanelProps> = ({ recipes }) => {
 
   return (
     <section className="w-full lg:w-96 bg-[#FCFBF9] p-6 overflow-y-auto flex flex-col gap-6 flex-shrink-0">
-      <div>
-        <h2 className="text-lg font-bold text-slate-800">AI Chef's Corner</h2>
-        <p className="text-xs text-slate-500">Delicious recipes tailored to your ingredients.</p>
+      <div className="flex items-center justify-between">
+        <div className="flex-1 pr-2">
+          <h2 className="text-lg font-bold text-slate-800">AI Chef's Corner</h2>
+          <p className="text-xs text-slate-505">Delicious recipes tailored to your ingredients.</p>
+        </div>
+        {inventoryCount > 0 && onGenerateRecipesClick && (
+          <button
+            type="button"
+            onClick={onGenerateRecipesClick}
+            disabled={isGenerating}
+            className="text-xs px-3 py-1.5 bg-teal-650 hover:bg-teal-700 text-white font-bold rounded-xl shadow-md transition cursor-pointer shrink-0 disabled:opacity-50"
+          >
+            {isGenerating ? 'Thinking...' : 'Get Recipes'}
+          </button>
+        )}
       </div>
 
       <div id="recipe-list-container" className="space-y-4 flex-1 flex flex-col">
@@ -48,9 +68,20 @@ export const RecipePanel: React.FC<RecipePanelProps> = ({ recipes }) => {
               </svg>
             </div>
             <span className="text-xs font-semibold text-slate-700">No Recipes Suggested</span>
-            <span className="text-[10px] text-slate-500 leading-normal max-w-[200px]">
+            <span className="text-[10px] text-slate-500 leading-normal max-w-[200px] mb-1">
               Scan your fridge pantry or log ingredients to get instant ideas.
             </span>
+            {inventoryCount > 0 && onGenerateRecipesClick && (
+              <button
+                type="button"
+                id="btn-empty-state-get-recipes"
+                onClick={onGenerateRecipesClick}
+                disabled={isGenerating}
+                className="mt-2 text-xs px-4 py-2 bg-teal-650 hover:bg-teal-700 text-white font-bold rounded-xl shadow-md transition cursor-pointer disabled:opacity-50"
+              >
+                {isGenerating ? 'Thinking...' : 'Get Recipes'}
+              </button>
+            )}
           </div>
         ) : (
           <div id="recipes-container" className="space-y-4">
