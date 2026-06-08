@@ -22,7 +22,7 @@ export const LeftPanel: React.FC<LeftPanelProps> = ({
   onScanClick,
 }) => {
   return (
-    <section className="w-full lg:w-80 bg-[#FCFBF9] border-b lg:border-b-0 lg:border-r border-slate-200 p-5 lg:overflow-y-auto flex flex-col gap-6 flex-shrink-0">
+    <section className="w-full lg:w-64 bg-[#FCFBF9] border-b lg:border-b-0 lg:border-r border-slate-200 p-5 lg:overflow-y-auto flex flex-col gap-6 flex-shrink-0">
       
       {/* Profile & Dietary Section */}
       <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm">
