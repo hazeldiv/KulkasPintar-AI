@@ -44,6 +44,7 @@ function AppContent() {
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [isRoomModalOpen, setIsRoomModalOpen] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [loaderMessage, setLoaderMessage] = useState<string>('');
   const [deleteConfirmState, setDeleteConfirmState] = useState<{
     isOpen: boolean;
     targetId: number | number[] | 'all' | null;
@@ -142,6 +143,36 @@ function AppContent() {
   useEffect(() => {
     checkAuth();
   }, []);
+
+  useEffect(() => {
+    let intervalId: any = null;
+
+    if (isAnalyzing) {
+      // Start polling
+      intervalId = setInterval(async () => {
+        try {
+          const res = await fetch('/api/ai-status');
+          if (res.ok) {
+            const data = await res.json();
+            if (data.isGeminiFailed) {
+              setLoaderMessage('response is a bit longer');
+            }
+          }
+        } catch (err) {
+          console.error('Failed to fetch AI status:', err);
+        }
+      }, 1500);
+    } else {
+      // Reset loader message
+      setLoaderMessage('');
+    }
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [isAnalyzing]);
 
   const handleSignOut = async () => {
     try {
@@ -618,7 +649,7 @@ function AppContent() {
         message={deleteConfirmState.message}
       />
 
-      <GlobalLoader isOpen={isAnalyzing} />
+      <GlobalLoader isOpen={isAnalyzing} message={loaderMessage} />
     </>
   );
 }

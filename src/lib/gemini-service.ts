@@ -1,4 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
+import { aiStatus } from '@/lib/ai-status';
 
 export interface ScanIngredient {
   name: string;
@@ -31,6 +32,103 @@ function handleGeminiError(error: unknown): never {
     throw new Error('AI server is busy. Please try again later.');
   }
   throw new Error(`Gemini API Error: ${error}`);
+}
+
+async function callOpenRouter(modelName: string, prompt: string): Promise<string> {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) {
+    throw new Error('OPENROUTER_API_KEY is not configured');
+  }
+
+  // First API call with reasoning
+  let response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      "model": modelName,
+      "messages": [
+        {
+          "role": "user",
+          "content": prompt
+        }
+      ],
+      "reasoning": {"enabled": true}
+    })
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`OpenRouter Error (${modelName}): ${response.status} - ${errorText}`);
+  }
+
+  const result = await response.json();
+  const msg1 = result.choices?.[0]?.message;
+  if (!msg1) {
+    throw new Error(`Invalid OpenRouter response from first call of ${modelName}`);
+  }
+
+  // Preserve the assistant message with reasoning_details
+  const messages = [
+    {
+      role: 'user',
+      content: prompt,
+    },
+    {
+      role: 'assistant',
+      content: msg1.content,
+      reasoning_details: msg1.reasoning_details, // Pass back unmodified
+    },
+    {
+      role: 'user',
+      content: "Are you sure? Think carefully.",
+    },
+  ];
+
+  // Second API call - model continues reasoning from where it left off
+  const response2 = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      "model": modelName,
+      "messages": messages  // Includes preserved reasoning_details
+    })
+  });
+
+  if (!response2.ok) {
+    const errorText = await response2.text();
+    throw new Error(`OpenRouter Error (${modelName} - Call 2): ${response2.status} - ${errorText}`);
+  }
+
+  const result2 = await response2.json();
+  const finalContent = result2.choices?.[0]?.message?.content;
+  if (!finalContent) {
+    throw new Error(`Invalid OpenRouter response from second call of ${modelName}`);
+  }
+
+  return finalContent;
+}
+
+async function callOpenRouterWithFallbacks(prompt: string): Promise<string> {
+  try {
+    console.log('Attempting fallback to openai/gpt-oss-20b:free...');
+    return await callOpenRouter("openai/gpt-oss-20b:free", prompt);
+  } catch (err1) {
+    console.error('Fallback to openai/gpt-oss-20b:free failed:', err1);
+    
+    try {
+      console.log('Attempting fallback to google/gemma-4-31b-it:free...');
+      return await callOpenRouter("google/gemma-4-31b-it:free", prompt);
+    } catch (err2) {
+      console.error('Fallback to google/gemma-4-31b-it:free failed:', err2);
+      throw new Error(`All LLM fallbacks failed. Original Gemini error was followed by: ${err1} and ${err2}`);
+    }
+  }
 }
 
 function getGeminiClient(): GoogleGenAI | null {
@@ -213,6 +311,9 @@ export async function analyzeFridgeImage(
   strictMatch: boolean = false,
   saveTheFood: boolean = false
 ): Promise<AnalyzeResponse> {
+  // Reset status at start of each execution
+  aiStatus.isGeminiFailed = false;
+
   const client = getGeminiClient();
   const invNames = inventoryItems.map((item) => item.name);
 
@@ -224,23 +325,17 @@ export async function analyzeFridgeImage(
     oldestItems = sorted.slice(0, 3).map((item) => item.name);
   }
 
-  if (!client) {
-    console.warn('GEMINI_API_KEY environment variable is not set. Running in Demo Mode.');
-    return generateMockData(dietaryRestrictions, invNames, strictMatch, oldestItems);
-  }
+  const inventoryContext = invNames.length > 0
+    ? `\nUser's Current Inventory: ${invNames.join(', ')}${
+        oldestItems.length > 0 ? `\nOldest Ingredients (Prioritize using these): ${oldestItems.join(', ')}` : ''
+      }`
+    : '';
 
-  try {
-    const inventoryContext = invNames.length > 0
-      ? `\nUser's Current Inventory: ${invNames.join(', ')}${
-          oldestItems.length > 0 ? `\nOldest Ingredients (Prioritize using these): ${oldestItems.join(', ')}` : ''
-        }`
-      : '';
+  const dietaryContext = dietaryRestrictions.length > 0
+    ? `\nDietary Restrictions (MUST strictly follow): ${dietaryRestrictions.join(', ')}`
+    : '';
 
-    const dietaryContext = dietaryRestrictions.length > 0
-      ? `\nDietary Restrictions (MUST strictly follow): ${dietaryRestrictions.join(', ')}`
-      : '';
-
-    const prompt = `
+  const prompt = `
 Analyze this image of a refrigerator or pantry. Perform two tasks:
 1. Extract all visible ingredients (items, quantity estimate, category, and an estimated shelf life / days to expiration based on general food storage guidelines).
 2. Generate exactly 3 recipes using the ingredients.
@@ -277,6 +372,31 @@ Return the results ONLY as a valid JSON object matching this schema:
 Do not write markdown block quotes (like \`\`\`json), just return raw JSON text.
 `;
 
+  if (!client) {
+    console.warn('GEMINI_API_KEY environment variable is not set. Running fallback...');
+    aiStatus.isGeminiFailed = true;
+    try {
+      const fallbackPrompt = `
+NOTE: We are in fallback mode. The image is unavailable. Instead of analyzing the image, simulate the analysis by listing 4 common, fresh ingredients (e.g. Eggs, Milk, Tomatoes, Cheese, or appropriate vegetarian/dietary alternatives) that match the dietary restrictions and are typically found in a fridge, and generate exactly 3 recipes using them.
+Here is the original prompt guidelines and JSON schema requirements you MUST follow:
+${prompt}
+`;
+      const fallbackResult = await callOpenRouterWithFallbacks(fallbackPrompt);
+      let resultText = fallbackResult.trim();
+      if (resultText.startsWith('```')) {
+        const lines = resultText.split('\n');
+        if (lines[0].startsWith('```')) lines.shift();
+        if (lines[lines.length - 1].startsWith('```')) lines.pop();
+        resultText = lines.join('\n').trim();
+      }
+      return JSON.parse(resultText) as AnalyzeResponse;
+    } catch (fallbackError) {
+      console.warn('Fallback failed, using local mock data as a last resort:', fallbackError);
+      return generateMockData(dietaryRestrictions, invNames, strictMatch, oldestItems);
+    }
+  }
+
+  try {
     const response = await client.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: [
@@ -305,7 +425,27 @@ Do not write markdown block quotes (like \`\`\`json), just return raw JSON text.
 
     return JSON.parse(resultText) as AnalyzeResponse;
   } catch (error) {
-    handleGeminiError(error);
+    console.warn('Gemini image analysis failed. Switching to OpenRouter fallbacks...', error);
+    aiStatus.isGeminiFailed = true;
+
+    try {
+      const fallbackPrompt = `
+NOTE: We are in fallback mode. The image is unavailable. Instead of analyzing the image, simulate the analysis by listing 4 common, fresh ingredients (e.g. Eggs, Milk, Tomatoes, Cheese, or appropriate vegetarian/dietary alternatives) that match the dietary restrictions and are typically found in a fridge, and generate exactly 3 recipes using them.
+Here is the original prompt guidelines and JSON schema requirements you MUST follow:
+${prompt}
+`;
+      const fallbackResult = await callOpenRouterWithFallbacks(fallbackPrompt);
+      let resultText = fallbackResult.trim();
+      if (resultText.startsWith('```')) {
+        const lines = resultText.split('\n');
+        if (lines[0].startsWith('```')) lines.shift();
+        if (lines[lines.length - 1].startsWith('```')) lines.pop();
+        resultText = lines.join('\n').trim();
+      }
+      return JSON.parse(resultText) as AnalyzeResponse;
+    } catch (fallbackError) {
+      handleGeminiError(fallbackError);
+    }
   }
 }
 
@@ -315,6 +455,9 @@ export async function generateRecipesFromIngredients(
   strictMatch: boolean = false,
   saveTheFood: boolean = false
 ): Promise<ScanRecipe[]> {
+  // Reset status at start of each execution
+  aiStatus.isGeminiFailed = false;
+
   const client = getGeminiClient();
   const invNames = inventoryItems.map((item) => item.name);
 
@@ -326,24 +469,17 @@ export async function generateRecipesFromIngredients(
     oldestItems = sorted.slice(0, 3).map((item) => item.name);
   }
 
-  if (!client) {
-    console.warn('GEMINI_API_KEY environment variable is not set. Running in Demo Mode.');
-    const mock = generateMockData(dietaryRestrictions, invNames, strictMatch, oldestItems);
-    return mock.recipes;
-  }
+  const inventoryContext = invNames.length > 0
+    ? `\nUser's Current Inventory: ${invNames.join(', ')}${
+        oldestItems.length > 0 ? `\nOldest Ingredients (Prioritize using these): ${oldestItems.join(', ')}` : ''
+      }`
+    : '';
 
-  try {
-    const inventoryContext = invNames.length > 0
-      ? `\nUser's Current Inventory: ${invNames.join(', ')}${
-          oldestItems.length > 0 ? `\nOldest Ingredients (Prioritize using these): ${oldestItems.join(', ')}` : ''
-        }`
-      : '';
+  const dietaryContext = dietaryRestrictions.length > 0
+    ? `\nDietary Restrictions (MUST strictly follow): ${dietaryRestrictions.join(', ')}`
+    : '';
 
-    const dietaryContext = dietaryRestrictions.length > 0
-      ? `\nDietary Restrictions (MUST strictly follow): ${dietaryRestrictions.join(', ')}`
-      : '';
-
-    const prompt = `
+  const prompt = `
 Generate exactly 3 recipes using the ingredients available.
 
 Parameters to follow strictly:
@@ -367,6 +503,27 @@ Return the results ONLY as a valid JSON array matching this schema:
 Do not write markdown block quotes (like \`\`\`json), just return raw JSON text.
 `;
 
+  if (!client) {
+    console.warn('GEMINI_API_KEY environment variable is not set. Running fallback...');
+    aiStatus.isGeminiFailed = true;
+    try {
+      const fallbackResult = await callOpenRouterWithFallbacks(prompt);
+      let resultText = fallbackResult.trim();
+      if (resultText.startsWith('```')) {
+        const lines = resultText.split('\n');
+        if (lines[0].startsWith('```')) lines.shift();
+        if (lines[lines.length - 1].startsWith('```')) lines.pop();
+        resultText = lines.join('\n').trim();
+      }
+      return JSON.parse(resultText) as ScanRecipe[];
+    } catch (fallbackError) {
+      console.warn('Fallback failed, using local mock data as a last resort:', fallbackError);
+      const mock = generateMockData(dietaryRestrictions, invNames, strictMatch, oldestItems);
+      return mock.recipes;
+    }
+  }
+
+  try {
     const response = await client.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: prompt,
@@ -387,7 +544,21 @@ Do not write markdown block quotes (like \`\`\`json), just return raw JSON text.
 
     return JSON.parse(resultText) as ScanRecipe[];
   } catch (error) {
-    handleGeminiError(error);
+    console.warn('Gemini recipe generation failed. Switching to OpenRouter fallbacks...', error);
+    aiStatus.isGeminiFailed = true;
+
+    try {
+      const fallbackResult = await callOpenRouterWithFallbacks(prompt);
+      let resultText = fallbackResult.trim();
+      if (resultText.startsWith('```')) {
+        const lines = resultText.split('\n');
+        if (lines[0].startsWith('```')) lines.shift();
+        if (lines[lines.length - 1].startsWith('```')) lines.pop();
+        resultText = lines.join('\n').trim();
+      }
+      return JSON.parse(resultText) as ScanRecipe[];
+    } catch (fallbackError) {
+      handleGeminiError(fallbackError);
+    }
   }
 }
-

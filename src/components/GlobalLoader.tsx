@@ -4,9 +4,10 @@ import React from 'react';
 
 interface GlobalLoaderProps {
   isOpen: boolean;
+  message?: string;
 }
 
-export const GlobalLoader: React.FC<GlobalLoaderProps> = ({ isOpen }) => {
+export const GlobalLoader: React.FC<GlobalLoaderProps> = ({ isOpen, message }) => {
   if (!isOpen) return null;
 
   return (
@@ -29,9 +30,11 @@ export const GlobalLoader: React.FC<GlobalLoaderProps> = ({ isOpen }) => {
           </svg>
         </div>
       </div>
-      <h3 id="loader-title" className="text-base font-bold text-slate-800">AI Chef is Analyzing...</h3>
-      <p id="loader-subtitle" className="text-xs text-slate-500 mt-1 max-w-[250px] text-center leading-relaxed">
-        Processing fridge image, identifying ingredients, and preparing recipe designs.
+      <h3 id="loader-title" className="text-base font-bold text-slate-800">
+        {message ? "Please wait..." : "AI Chef is Analyzing..."}
+      </h3>
+      <p id="loader-subtitle" className="text-xs text-slate-500 mt-1 max-w-[280px] text-center leading-relaxed">
+        {message || "Processing fridge image, identifying ingredients, and preparing recipe designs."}
       </p>
     </div>
   );
